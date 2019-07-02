@@ -26,8 +26,6 @@ import sqlite3
 
 app = Flask(__name__)
 
-conn = sqlite3.connect("install.db")
-
 repo = None
 install_id = None
 
@@ -91,8 +89,11 @@ def webhook():
             if r["full_name"] == "trojan-gfw/trojan":
                 repo = r["full_name"]
                 install_id = data["installation"]["id"]
+                conn = sqlite3.connect("install.db")
                 c = conn.cursor()
                 c.execute("INSERT INTO data VALUES (?, ?)", (install_id, repo))
+                conn.commit()
+                conn.close()
     return ""
 
 def close(number):
@@ -157,17 +158,20 @@ def get_jwt():
 
 def main():
     global repo, install_id
+    conn = sqlite3.connect("install.db")
     c = conn.cursor()
     c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='data'")
     row = c.fetchone()
     if row is None:
         c.execute("CREATE TABLE data (install_id INTEGER PRIMARY KEY, repo VARCHAR(255))")
+        conn.commit()
     else:
         c.execute("SELECT install_id, repo FROM data ORDER BY install_id DESC LIMIT 1")
         row = c.fetchone()
         if row is not None:
             install_id = row[0]
             repo = row[1]
+    conn.close()
     app.run(port=50000)
 
 if __name__ == '__main__':
